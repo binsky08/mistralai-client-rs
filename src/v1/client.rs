@@ -1,12 +1,9 @@
 use futures::stream::StreamExt;
 use futures::Stream;
 use log::debug;
+use parking_lot::Mutex;
 use reqwest::Error as ReqwestError;
-use std::{
-    any::Any,
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{any::Any, collections::HashMap, sync::Arc};
 
 use crate::v1::{chat, chat_stream, constants, embedding, error, model_list, tool, utils};
 
@@ -16,7 +13,7 @@ pub struct Client {
     pub max_retries: u32,
     pub timeout: u32,
 
-    functions: Arc<Mutex<HashMap<String, Box<dyn tool::Function>>>>,
+    functions: Arc<Mutex<HashMap<String, Box<dyn tool::Function + Send>>>>,
     last_function_call_result: Arc<Mutex<Option<Box<dyn Any + Send>>>>,
 }
 
@@ -332,7 +329,7 @@ impl Client {
     }
 
     pub fn get_last_function_call_result(&self) -> Option<Box<dyn Any + Send>> {
-        let mut result_lock = self.last_function_call_result.lock().unwrap();
+        let mut result_lock = self.last_function_call_result.lock();
 
         result_lock.take()
     }
@@ -365,8 +362,8 @@ impl Client {
         }
     }
 
-    pub fn register_function(&mut self, name: String, function: Box<dyn tool::Function>) {
-        let mut functions = self.functions.lock().unwrap();
+    pub fn register_function(&mut self, name: String, function: Box<dyn tool::Function + Send>) {
+        let mut functions = self.functions.lock();
 
         functions.insert(name, function);
     }
@@ -424,7 +421,7 @@ impl Client {
             Some(first_choice) => match first_choice.message.tool_calls.to_owned() {
                 Some(tool_calls) => match tool_calls.get(0) {
                     Some(first_tool_call) => {
-                        let functions = self.functions.lock().unwrap();
+                        let functions = self.functions.lock();
                         match functions.get(&first_tool_call.function.name) {
                             Some(function) => {
                                 let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -446,7 +443,7 @@ impl Client {
             None => None,
         };
 
-        let mut last_result_lock = self.last_function_call_result.lock().unwrap();
+        let mut last_result_lock = self.last_function_call_result.lock();
         *last_result_lock = next_result;
     }
 
@@ -455,7 +452,7 @@ impl Client {
             Some(first_choice) => match first_choice.message.tool_calls.to_owned() {
                 Some(tool_calls) => match tool_calls.get(0) {
                     Some(first_tool_call) => {
-                        let functions = self.functions.lock().unwrap();
+                        let functions = self.functions.lock();
                         match functions.get(&first_tool_call.function.name) {
                             Some(function) => {
                                 let result = function
@@ -474,7 +471,7 @@ impl Client {
             None => None,
         };
 
-        let mut last_result_lock = self.last_function_call_result.lock().unwrap();
+        let mut last_result_lock = self.last_function_call_result.lock();
         *last_result_lock = next_result;
     }
 
