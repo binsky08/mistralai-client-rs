@@ -116,7 +116,7 @@ impl Client {
             Ok(data) => {
                 utils::debug_pretty_json_from_struct("Response Data", &data);
 
-                self.call_function_if_any(data.clone());
+                //self.call_function_if_any(data.clone());
 
                 Ok(data)
             }
@@ -172,7 +172,7 @@ impl Client {
             Ok(data) => {
                 utils::debug_pretty_json_from_struct("Response Data", &data);
 
-                self.call_function_if_any_async(data.clone()).await;
+                //self.call_function_if_any_async(data.clone()).await;
 
                 Ok(data)
             }
